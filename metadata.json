@@ -1,0 +1,6 @@
+{
+  "name": "Aether Intelligence",
+  "description": "An elegant, neural settings and advanced reasoning workspace with customized intelligence engines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@theme {
+  --color-tertiary-container: #8e9193;
+  --color-primary-container: #a078ff;
+  --color-on-tertiary-fixed: #191c1e;
+  --color-surface-bright: #2a3a4f;
+  --color-on-secondary-container: #adb4ce;
+  --color-on-surface: #d3e4fe;
+  --color-tertiary-fixed-dim: #c4c7c9;
+  --color-on-tertiary: #2d3133;
+  --color-outline-variant: #494454;
+  --color-inverse-on-surface: #213145;
+  --color-on-secondary-fixed-variant: #3f465c;
+  --color-on-tertiary-fixed-variant: #444749;
+  --color-on-surface-variant: #cbc3d7;
+  --color-on-background: #d3e4fe;
+  --color-secondary: #bec6e0;
+  --color-secondary-container: #3f465c;
+  --color-on-tertiary-container: #272a2c;
+  --color-surface-container-lowest: #000f21;
+  --color-outline: #958ea0;
+  --color-surface-container-low: #0b1c30;
+  --color-surface-container-high: #1b2b3f;
+  --color-on-primary-fixed: #23005c;
+  --color-surface-dim: #031427;
+  --color-tertiary: #c4c7c9;
+  --color-primary-fixed-dim: #d0bcff;
+  --color-on-primary-fixed-variant: #5516be;
+  --color-inverse-primary: #6d3bd7;
+  --color-error: #ffb4ab;
+  --color-tertiary-fixed: #e0e3e5;
+  --color-surface: #031427;
+  --color-inverse-surface: #d3e4fe;
+  --color-primary: #d0bcff;
+  --color-surface-container-highest: #26364a;
+  --color-on-error: #690005;
+  --color-primary-fixed: #e9ddff;
+  --color-on-error-container: #ffdad6;
+  --color-secondary-fixed: #dae2fd;
+  --color-surface-variant: #26364a;
+  --color-on-secondary-fixed: #131b2e;
+  --color-surface-container: #102034;
+  --color-on-primary-container: #340080;
+  --color-surface-tint: #d0bcff;
+  --color-background: #031427;
+  --color-error-container: #93000a;
+  --color-on-secondary: #283044;
+  --color-on-primary: #3c0091;
+  --color-secondary-fixed-dim: #bec6e0;
+
+  --font-sans: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Base custom styles based on the provided aesthetic */
+.glass-panel {
+  background: rgba(11, 28, 48, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card {
+  background: rgba(11, 28, 48, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.glass-input {
+  background: rgba(3, 20, 39, 0.6);
+  border: 1px solid rgba(149, 142, 160, 0.2);
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  border-color: #d0bcff;
+  box-shadow: 0 0 0 2px rgba(208, 188, 255, 0.1);
+}
+
+.inner-glow {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+.ai-gradient-text {
+  background: linear-gradient(135deg, #d0bcff 0%, #a078ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes floatSpeedy {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-12px) scale(1.02); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+.animate-float {
+  animation: floatSpeedy 7s ease-in-out infinite;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(149, 142, 160, 0.2);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(149, 142, 160, 0.4);
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-active {
+  background: linear-gradient(90deg, transparent, rgba(208, 188, 255, 0.15), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite linear;
+}
+
+.light-theme-support {
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-dim: #f1f5f9;
+  --color-surface-container: #e2e8f0;
+  --color-surface-container-low: #f8fafc;
+  --color-surface-container-high: #cbd5e1;
+  --color-surface-container-highest: #94a3b8;
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #475569;
+  --color-on-background: #0f172a;
+}
+
