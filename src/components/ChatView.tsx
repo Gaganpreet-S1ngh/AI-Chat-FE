@@ -169,22 +169,22 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
           if (eventType === "done") {
             break;
           }
-          accumulatedText += JSON.parse(data);
 
-          onUpdateSession({
-            ...session,
-            messages: [
-              ...updatedMessages,
-              {
-                ...assistantMessage,
-                content: accumulatedText
-              }
-            ],
-            title: updatedTitle,
-          });
           if (data) {
             try {
+              accumulatedText += JSON.parse(data);
 
+              onUpdateSession({
+                ...session,
+                messages: [
+                  ...updatedMessages,
+                  {
+                    ...assistantMessage,
+                    content: accumulatedText
+                  }
+                ],
+                title: updatedTitle,
+              });
             } catch (error) {
               console.error(error);
             }
