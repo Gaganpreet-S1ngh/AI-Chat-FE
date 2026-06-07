@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { ChatSession, ChatMessage, SettingsState } from "../types";
+import "katex/dist/katex.min.css";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 
 interface ChatViewProps {
   session: ChatSession;
@@ -7,6 +11,25 @@ interface ChatViewProps {
   onUpdateSession: (updated: ChatSession) => void;
 }
 
+// Rendering latex response from backend
+
+export function MessageRenderer({
+  content,
+}: {
+  content: string;
+}) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+// THIS SESSION IS FOR STATE MAINTENENCE USED BY DIFFERENT COMPONENTS
+//
 export default function ChatView({ session, settings, onUpdateSession }: ChatViewProps) {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +54,8 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
     const finalPrompt = textToSend || inputText;
     if (!finalPrompt.trim() || isLoading) return;
 
+
+
     // Create user message object
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -40,12 +65,36 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
     };
 
     const updatedMessages = [...session.messages, userMessage];
-    
+
     // Update parent session with user prompt instantly
     onUpdateSession({
       ...session,
       messages: updatedMessages
     });
+
+    // Set session title if it was "New Conversation..." or empty
+    let updatedTitle = session.title;
+    if (session.title.startsWith("New Session") || session.title.startsWith("New Conversation") || updatedMessages.length <= 2) {
+      updatedTitle = finalPrompt.length > 25 ? finalPrompt.substring(0, 25) + "..." : finalPrompt;
+    }
+
+
+    const assistantMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    };
+
+    onUpdateSession({
+      ...session,
+      messages: [...updatedMessages, assistantMessage],
+      title: updatedTitle
+    });
+
 
     setInputText("");
     setIsLoading(true);
@@ -57,48 +106,98 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
         content: m.content
       }));
 
-      const res = await fetch("/api/gemini/chat", {
+      // Send stream request
+      const response = await fetch("http://localhost:7007/chat/stream", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          message: finalPrompt,
-          history: historyLog,
-          engine: settings.engine,
-          systemInstruction: settings.systemInstruction,
-          enableSearchGrounding: settings.enableSearchGrounding
+          role: settings.systemInstruction || "assistant",
+          prompt: finalPrompt
         })
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate AI response.");
+      if (!response.ok) {
+        throw new Error("Failed to start stream");
       }
 
-      // Create model message object
-      const modelMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.text,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        sources: data.sources
-      };
 
-      // Set session title if it was "New Conversation..." or empty
-      let updatedTitle = session.title;
-      if (session.title.startsWith("New Session") || session.title.startsWith("New Conversation") || updatedMessages.length <= 2) {
-        updatedTitle = finalPrompt.length > 25 ? finalPrompt.substring(0, 25) + "..." : finalPrompt;
+      // Read SSE Stream
+      const reader = response.body?.getReader();
+
+      if (!reader) {
+        throw new Error("Stream not supported");
       }
 
-      onUpdateSession({
-        ...session,
-        title: updatedTitle,
-        messages: [...updatedMessages, modelMessage]
-      });
+      const decoder = new TextDecoder();
+
+      let accumulatedText = "";
+      let buffer = "";
+
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true })
+
+
+
+        // this is the chunks which are splitted using \n\n in backend
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+
+        for (const event of events) {
+
+          const lines = event.split("\n");
+
+          let eventType = "message";
+          let data = "";
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              eventType = line.replace("event:", "").trim()
+            }
+
+            if (line.startsWith("data:")) {
+              data = line.replace("data:", "").trim();
+            }
+          }
+
+          if (eventType === "done") {
+            break;
+          }
+          accumulatedText += JSON.parse(data);
+
+          onUpdateSession({
+            ...session,
+            messages: [
+              ...updatedMessages,
+              {
+                ...assistantMessage,
+                content: accumulatedText
+              }
+            ],
+            title: updatedTitle,
+          });
+          if (data) {
+            try {
+
+            } catch (error) {
+              console.error(error);
+            }
+          }
+        }
+
+      }
+
+
 
     } catch (err: any) {
       console.error(err);
-      
+
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -127,7 +226,7 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
   const renderMessageContent = (content: string) => {
     // Basic formatting for triple backticks code blocks
     const parts = content.split(/(```[\s\S]*?```)/g);
-    
+
     return parts.map((part, index) => {
       if (part.startsWith("```") && part.endsWith("```")) {
         // Parse out language & code
@@ -209,11 +308,11 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
 
   return (
     <div className="flex-grow flex flex-col h-[calc(100vh-64px)] overflow-hidden relative">
-      
+
       {/* Scrollable messages container */}
       <section className="flex-grow overflow-y-auto pb-44 pt-6">
         <div className="max-w-[800px] mx-auto px-4 space-y-6">
-          
+
           {/* Welcome State when Session is Empty */}
           {session.messages.length === 0 && (
             <div className="flex flex-col items-center justify-center min-h-[50vh] text-center animate-fade-in py-12">
@@ -267,14 +366,15 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
 
                 <div className={`flex flex-col gap-1 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
                   <div
-                    className={`rounded-2xl p-4 md:p-5 relative overflow-hidden ${
-                      isUser
-                        ? "bg-secondary-container text-on-secondary-container rounded-tr-none border border-outline-variant/30"
-                        : "glass-panel rounded-tl-none relative before:absolute before:top-0 before:left-0 before:w-1 before:h-full before:bg-primary/30"
-                    }`}
+                    className={`rounded-2xl p-4 md:p-5 relative overflow-hidden ${isUser
+                      ? "bg-secondary-container text-on-secondary-container rounded-tr-none border border-outline-variant/30"
+                      : "glass-panel rounded-tl-none relative before:absolute before:top-0 before:left-0 before:w-1 before:h-full before:bg-primary/30"
+                      }`}
                   >
                     {/* Render Formatted Content (Text & styled code snippets) */}
-                    <div>{renderMessageContent(message.content)}</div>
+                    <div className="prose prose-invert max-w-none">
+                      <MessageRenderer content={message.content} />
+                    </div>
 
                     {/* Sources grounding checklist display */}
                     {!isUser && message.sources && message.sources.length > 0 && (
@@ -308,17 +408,15 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleEval(message.id, "up")}
-                          className={`cursor-pointer material-symbols-outlined hover:text-primary transition-colors text-sm focus:outline-none ${
-                            evals[message.id] === "up" ? "text-primary fill-current font-bold" : ""
-                          }`}
+                          className={`cursor-pointer material-symbols-outlined hover:text-primary transition-colors text-sm focus:outline-none ${evals[message.id] === "up" ? "text-primary fill-current font-bold" : ""
+                            }`}
                         >
                           thumb_up
                         </button>
                         <button
                           onClick={() => handleEval(message.id, "down")}
-                          className={`cursor-pointer material-symbols-outlined hover:text-primary transition-colors text-sm focus:outline-none ${
-                            evals[message.id] === "down" ? "text-primary fill-current font-bold" : ""
-                          }`}
+                          className={`cursor-pointer material-symbols-outlined hover:text-primary transition-colors text-sm focus:outline-none ${evals[message.id] === "down" ? "text-primary fill-current font-bold" : ""
+                            }`}
                         >
                           thumb_down
                         </button>
@@ -365,7 +463,7 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
       {/* Floating Chat Input Section */}
       <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-background via-background/90 to-transparent">
         <div className="max-w-[800px] mx-auto relative">
-          
+
           {/* Quick Info/Tools Panel */}
           <div className="glass-panel flex gap-2 items-center rounded-3xl p-1.5 shadow-xl">
             <button
@@ -389,11 +487,10 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
             <div className="flex items-center gap-1.5 pr-1">
               <button
                 onClick={handleMicToggle}
-                className={`cursor-pointer w-10 h-10 rounded-full flex items-center justify-center transition-all focus:outline-none ${
-                  micActive
-                    ? "bg-primary text-on-primary animate-pulse"
-                    : "text-on-surface-variant hover:bg-surface-container-highest"
-                }`}
+                className={`cursor-pointer w-10 h-10 rounded-full flex items-center justify-center transition-all focus:outline-none ${micActive
+                  ? "bg-primary text-on-primary animate-pulse"
+                  : "text-on-surface-variant hover:bg-surface-container-highest"
+                  }`}
                 title={micActive ? "Speech recognition listening..." : "Use voice input"}
               >
                 <span className="material-symbols-outlined text-lg">
@@ -404,11 +501,10 @@ export default function ChatView({ session, settings, onUpdateSession }: ChatVie
               <button
                 onClick={() => handleSend()}
                 disabled={isLoading || !inputText.trim()}
-                className={`cursor-pointer w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md focus:outline-none ${
-                  isLoading || !inputText.trim()
-                    ? "bg-surface-container-highest text-on-surface-variant opacity-50 cursor-not-allowed"
-                    : "bg-primary text-on-primary hover:opacity-95 hover:scale-105 active:scale-95 shadow-primary/20"
-                }`}
+                className={`cursor-pointer w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md focus:outline-none ${isLoading || !inputText.trim()
+                  ? "bg-surface-container-highest text-on-surface-variant opacity-50 cursor-not-allowed"
+                  : "bg-primary text-on-primary hover:opacity-95 hover:scale-105 active:scale-95 shadow-primary/20"
+                  }`}
               >
                 <span className="material-symbols-outlined font-bold text-md">
                   arrow_upward
